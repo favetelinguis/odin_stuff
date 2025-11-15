@@ -3,15 +3,27 @@ package lisp2
 import "core:strings"
 import "core:testing"
 
-// TODO i would like the environment to own all data
-
 Environment :: struct {
-	data: map[string]^Expression,
+	parent: ^Environment,
+	data:   map[string]^Expression,
 }
 
 env_init :: proc(env: ^Environment, allocator := context.allocator, loc := #caller_location) {
 	data := make(map[string]^Expression, allocator, loc)
 	env.data = data
+}
+
+// clone all values and takes keeps the same reference for the parent
+env_clone :: proc(
+	from: Environment,
+	to: ^Environment,
+	allocator := context.allocator,
+	loc := #caller_location,
+) {
+	for key, expr in from.data {
+		to.data[strings.clone(key, allocator, loc)] = clone(expr)
+	}
+	to.parent = from.parent
 }
 
 // Clear all entries in the environment
@@ -43,11 +55,12 @@ env_delete :: proc(env: ^Environment, k: string) {
 	k, v := delete_key(&env.data, k)
 	if k != "" {
 		delete(k)
-		free(v)
+		expression_free(v)
 	}
 }
 
 // Copy the associated value or return an error if no key found
+// Check if not find in env contionue checking parent
 env_get :: proc(
 	env: ^Environment,
 	k: string,
@@ -59,6 +72,8 @@ env_get :: proc(
 ) {
 	if env_contains(env^, k) {
 		return clone(env.data[k], allocator, loc), nil
+	} else if env.parent != nil {
+		return env_get(env.parent, k)
 	}
 	return nil, .Symbol_Not_Found
 }
@@ -69,7 +84,7 @@ env_contains :: proc(env: Environment, k: string) -> bool {
 
 env_add_builtin :: proc(env: ^Environment, k: string, fn: Builtin) {
 	expr: Expression
-	func_expr: Function
+	func_expr: BuiltinFunction
 	func_expr.fn = fn
 	expr = func_expr
 	env_add(env, k, &expr)

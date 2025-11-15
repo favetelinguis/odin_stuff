@@ -21,8 +21,14 @@ Number :: struct {
 }
 
 Builtin :: proc(_: ^Environment, _: ^Expression) -> (^Expression, Eval_Error)
-Function :: struct {
+BuiltinFunction :: struct {
 	fn: Builtin,
+}
+
+Lambda :: struct {
+	env:     Environment,
+	formals: ^Expression,
+	body:    ^Expression,
 }
 
 Cons_Cell :: struct {
@@ -36,7 +42,8 @@ T :: struct {}
 Expression :: union {
 	Symbol, // can be a form or a special form like quote
 	Number,
-	Function,
+	BuiltinFunction,
+	Lambda,
 	Cons_Cell, // s-expression
 	NIL,
 	T,
@@ -44,6 +51,27 @@ Expression :: union {
 
 expr_new :: proc(allocator := context.temp_allocator, loc := #caller_location) -> ^Expression {
 	return new(Expression, allocator, loc)
+}
+
+// TODO this can be called make_closure i think the (parameter, body, current env) is for let and lambda etc this is a more general
+// pattern then just lambda
+expr_new_lambda :: proc(
+	formals: ^Expression,
+	body: ^Expression,
+	parent_env: ^Environment,
+	allocator := context.temp_allocator,
+	loc := #caller_location,
+) -> ^Expression {
+	expr := expr_new(allocator, loc)
+	lambda := Lambda {
+		formals = formals,
+		body    = body,
+		env     = Environment{}, // this is pattern i want, this makes the lambda the owner of the environment
+	}
+	env_init(&lambda.env)
+	lambda.env.parent = parent_env
+	expr^ = lambda
+	return expr
 }
 
 cons :: proc(

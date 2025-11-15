@@ -44,10 +44,18 @@ clone :: proc(
 			value = expr.value,
 		}
 
-	case Function:
-		cloned^ = Function {
+	case BuiltinFunction:
+		cloned^ = BuiltinFunction {
 			fn = expr.fn, // function pointer is copied
 		}
+
+	case Lambda:
+		lambda := Lambda {
+			body    = clone(expr.body, allocator, loc),
+			formals = clone(expr.formals, allocator, loc),
+		}
+		env_clone(expr.env, &lambda.env, allocator, loc)
+		cloned^ = lambda
 
 	case Cons_Cell:
 		// Recursively clone both car and cdr
@@ -56,9 +64,9 @@ clone :: proc(
 			cdr = clone(expr.cdr, allocator, loc),
 		}
 	case NIL:
-		cloned^ = NIL{}
+		cloned^ = NIL{} // TODO this should only ever return the pointer to nil in env put there from stdlib
 	case T:
-		cloned^ = T{}
+		cloned^ = T{} // TODO this should only ever return the pointer to t in env put there from stdlib
 	}
 
 	return cloned
@@ -70,15 +78,22 @@ expression_free :: proc(
 	loc := #caller_location,
 ) {
 	// Free string and other stuff
-	#partial switch e in expr {
+	switch &e in expr {
 	case Symbol:
 		delete(e.name)
+		free(expr)
+	case BuiltinFunction, Number, NIL, T:
+		free(expr)
+	case Lambda:
+		expression_free(e.body)
+		expression_free(e.formals)
+		env_destroy(&e.env)
 	case Cons_Cell:
 		// Recursively free both car and cdr
 		expression_free(e.car, allocator, loc)
 		expression_free(e.cdr, allocator, loc)
 	}
-	free(expr)
+
 }
 
 // Add more detailed error in next version
@@ -103,14 +118,16 @@ Eval_Error :: enum {
 // car is conscell we have a tree
 //
 eval :: proc(env: ^Environment, expr: ^Expression) -> (result: ^Expression, err: Eval_Error) {
-	expr_print(expr)
 	switch e in expr^ {
 	case Symbol:
 		lookup := env_get(env, e.name) or_return
 		return lookup, nil
 
-	case Number, Function, NIL, T:
+	case Number, BuiltinFunction, NIL, T:
 		// TODO should nil and t be put in env and treated as symbol
+		return expr, nil
+
+	case Lambda:
 		return expr, nil
 
 	case Cons_Cell:
@@ -129,11 +146,13 @@ eval :: proc(env: ^Environment, expr: ^Expression) -> (result: ^Expression, err:
 				return nil, .Bang //eval_if(env, e)
 			case "define":
 				binding_name := car(cdr(e).(Cons_Cell)).(Symbol).name // get the name
-				binding_expr := eval_list(env, cdr(cdr(e).(Cons_Cell))) or_return
-				env_add(env, binding_name, car(binding_expr.(Cons_Cell)))
-				return expr, nil // TODO this should return the binding?
+				binding_expr := eval(env, car(cdr(cdr(e).(Cons_Cell)).(Cons_Cell))) or_return
+				env_add(env, binding_name, binding_expr)
+				return binding_expr, nil
 			case "lambda":
-				return nil, .Bang //eval_lambda(env, e)
+				// important part here is that formals do not lookup in env, we just want them to stay as symbols
+				lambda := expr_new_lambda(car(cdr(e).(Cons_Cell)), cdr(cdr(e).(Cons_Cell)), env)
+				return lambda, nil
 			}
 		}
 
@@ -141,7 +160,10 @@ eval :: proc(env: ^Environment, expr: ^Expression) -> (result: ^Expression, err:
 		evaluated_head := eval(env, head) or_return
 
 		// check so head is a function
-		if fn, ok := evaluated_head^.(Function); ok {
+		if fn, ok := evaluated_head^.(BuiltinFunction); ok {
+			return apply(&fn, cdr(e), env)
+		}
+		if fn, ok := evaluated_head^.(Lambda); ok {
 			return apply(&fn, cdr(e), env)
 		}
 		return nil, .Head_Is_Not_A_Function // Error. head is not a Function
@@ -162,8 +184,38 @@ eval_list :: proc(env: ^Environment, expr: ^Expression) -> (result: ^Expression,
 	return expr, nil // TODO assume that this only happen when we reaches the end
 }
 
-apply :: proc(
-	fn: ^Function,
+apply :: proc {
+	lambda_apply,
+	builtin_function_apply,
+}
+
+lambda_apply :: proc(
+	fn: ^Lambda,
+	arg_exprs: ^Expression,
+	env: ^Environment,
+) -> (
+	result: ^Expression,
+	err: Eval_Error,
+) {
+	// If user function lambda evaluate arguments and bind to parameters
+	args := eval_list(env, arg_exprs) or_return
+	// TODO could use curry here but right now number of args must match number of formals
+	lambda_bind_args(&fn.env, fn.formals, args)
+	return eval(&fn.env, car(fn.body.(Cons_Cell))) // TODO dunderstand why i always need to make car here, think i have some fundamental error
+}
+
+// bind evaluated_args to formals symbols in env for use by body
+lambda_bind_args :: proc(env: ^Environment, formals: ^Expression, evaluated_args: ^Expression) {
+	next_formal := car(formals.(Cons_Cell)).(Symbol)
+	env_add(env, next_formal.name, car(evaluated_args.(Cons_Cell)))
+	if _, ok := cdr(formals.(Cons_Cell)).(NIL); !ok {
+		// TODO will fail if number of args do not match number of bindings
+		lambda_bind_args(env, cdr(formals.(Cons_Cell)), cdr(evaluated_args.(Cons_Cell)))
+	}
+}
+
+builtin_function_apply :: proc(
+	fn: ^BuiltinFunction,
 	arg_exprs: ^Expression,
 	env: ^Environment,
 ) -> (

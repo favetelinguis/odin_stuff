@@ -13,8 +13,10 @@ expr_print :: proc(start: ^Expression) {
 		fmt.print(" ", expr.name)
 	case Number:
 		fmt.print(" ", expr.value)
-	case Function:
+	case BuiltinFunction:
 		fmt.print(" <function>")
+	case Lambda:
+		fmt.print(" <lambda>") // TODO can imrove this printing with actual sexpr
 	case Cons_Cell:
 		fmt.print("(")
 		expr_print(expr.car)

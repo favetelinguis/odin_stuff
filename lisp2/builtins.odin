@@ -1,7 +1,7 @@
 package lisp2
 
-import "core:fmt"
 import "core:testing"
+
 // When function is called all children of the should have been fully evaluated into a list
 builtin_op :: proc(env: ^Environment, args: ^Expression, op: rune) -> (^Expression, Eval_Error) {
 	result_expr := new(Expression, context.temp_allocator)
