@@ -38,8 +38,13 @@ main :: proc() {
 			break
 		}
 		input: string = string(buffer[:n])
-		repl_step(repl, input)
-		expr_print(repl.last)
+	    repl_err := repl_step(repl, input)
+	    if repl_err != nil {
+		fmt.print("Error: ", repl_err)
+	    } else {
+		fmt.print("Result: ")
+		expr_print(repl.last)		
+	    }
 		fmt.print("\n")
 
 		buffer = {} // make sure to clear the buffer not sure this is even needed

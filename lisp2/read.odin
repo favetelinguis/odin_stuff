@@ -1,6 +1,5 @@
 package lisp2
 
-
 import "core:log"
 import "core:strconv"
 import "core:strings"
@@ -79,7 +78,7 @@ quote :: proc(
 ) -> ^Expression {
 	expr := new(Expression, allocator, loc)
 	expr^ = Symbol {
-		name = strings.clone("quoted", allocator, loc),
+		name = strings.clone("quote", allocator, loc),
 	}
 	return cons(expr, current)
 }
@@ -206,7 +205,7 @@ read :: proc(state: ^Reader_State) -> (expression: ^Expression, err: Eval_Error)
 		expr := read(state) or_return
 		quote_symbol := expr_new()
 		quote_symbol^ = Symbol {
-			name = "quoted",
+			name = "quote",
 		}
 		nil_symbol := expr_new()
 		nil_symbol^ = NIL{}

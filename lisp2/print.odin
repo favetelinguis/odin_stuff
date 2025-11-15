@@ -8,9 +8,6 @@ Print_Error :: struct {
 }
 
 expr_print :: proc(start: ^Expression) {
-	if start == nil {
-		fmt.eprint("can not print nil expressions")
-	}
 	switch expr in start^ {
 	case Symbol:
 		fmt.print(" ", expr.name)
@@ -19,7 +16,6 @@ expr_print :: proc(start: ^Expression) {
 	case Function:
 		fmt.print(" <function>")
 	case Cons_Cell:
-		// Recursively clone both car and cdr
 		fmt.print("(")
 		expr_print(expr.car)
 		expr_print(expr.cdr)

@@ -29,10 +29,10 @@ repl_swap_last :: proc(repl: ^Repl, expr: ^Expression) {
 repl_step :: proc(repl: ^Repl, src: string) -> Eval_Error {
 	defer free_all(context.temp_allocator)
 
-	reader: Reader_State
-	reader.src = src
+	reader := new(Reader_State, context.temp_allocator)
+	init_reader_state(reader, src)
 
-	rexpr := read(&reader) or_return
+	rexpr := read(reader) or_return
 	eexpr := eval(repl.env, rexpr) or_return
 	repl_swap_last(repl, eexpr)
 	return nil

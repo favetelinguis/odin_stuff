@@ -4,18 +4,11 @@ import "core:fmt"
 import "core:strings"
 
 // Can evaluate quoted
-eval :: proc(env: ^Environment, expr: ^Expression) -> (^Expression, Eval_Error) {
-	if is_quoted(expr) {
-		// remove car which is quoted special form and evaluate cdr
-		return eval_expression(env, cdr(expr.(Cons_Cell)))
-	}
-	return eval_expression(env, expr)
-}
 
 is_quoted :: proc(expr: ^Expression) -> bool {
 	if c, ok := expr.(Cons_Cell); ok {
 		if s, ok2 := car(c).(Symbol); ok2 {
-			return s.name == "quoted"
+			return s.name == "quote"
 		}
 	}
 	return false
@@ -109,18 +102,8 @@ Eval_Error :: enum {
 // cons cdr is not conscell or nil improper list
 // car is conscell we have a tree
 //
-eval_expression :: proc(
-	env: ^Environment,
-	expr: ^Expression,
-) -> (
-	result: ^Expression,
-	err: Eval_Error,
-) {
-	// handle nil expressions
-	if expr == nil {
-		return nil, .Bang
-	}
-
+eval :: proc(env: ^Environment, expr: ^Expression) -> (result: ^Expression, err: Eval_Error) {
+	expr_print(expr)
 	switch e in expr^ {
 	case Symbol:
 		lookup := env_get(env, e.name) or_return
@@ -145,14 +128,17 @@ eval_expression :: proc(
 			case "if":
 				return nil, .Bang //eval_if(env, e)
 			case "define":
-				return nil, .Bang //eval_define(env, e)
+				binding_name := car(cdr(e).(Cons_Cell)).(Symbol).name // get the name
+				binding_expr := eval_list(env, cdr(cdr(e).(Cons_Cell))) or_return
+				env_add(env, binding_name, car(binding_expr.(Cons_Cell)))
+				return expr, nil // TODO this should return the binding?
 			case "lambda":
 				return nil, .Bang //eval_lambda(env, e)
 			}
 		}
 
 		// evaluate the head (function position)
-		evaluated_head := eval_expression(env, head) or_return
+		evaluated_head := eval(env, head) or_return
 
 		// check so head is a function
 		if fn, ok := evaluated_head^.(Function); ok {
@@ -164,10 +150,11 @@ eval_expression :: proc(
 	// we should never reach here
 }
 
+// always return a cons_cell not sure this is correct,
 eval_list :: proc(env: ^Environment, expr: ^Expression) -> (result: ^Expression, err: Eval_Error) {
 
 	if cons_val, ok := expr^.(Cons_Cell); ok {
-		first := eval_expression(env, car(cons_val)) or_return
+		first := eval(env, car(cons_val)) or_return
 		rest := eval_list(env, cdr(cons_val)) or_return
 		return cons(first, rest), nil
 	}

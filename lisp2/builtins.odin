@@ -3,10 +3,14 @@ package lisp2
 import "core:fmt"
 import "core:testing"
 // When function is called all children of the should have been fully evaluated into a list
-builtin_op :: proc(env: ^Environment, expr: ^Expression, op: rune) -> (^Expression, Eval_Error) {
+builtin_op :: proc(env: ^Environment, args: ^Expression, op: rune) -> (^Expression, Eval_Error) {
 	result_expr := new(Expression, context.temp_allocator)
 	acc: int
-	next := expr
+	// init acc with first arg
+	if first_arg, ok := car(args.(Cons_Cell)).(Number); ok {
+		acc = first_arg.value
+	}
+	next := cdr(args.(Cons_Cell)) // skip first arg
 	for {
 		if _, ok := next.(NIL); ok {
 			break
@@ -59,7 +63,8 @@ builtin_populate_env :: proc(env: ^Environment) -> int {
 	env_add_builtin(env, "-", builtin_sub)
 	env_add_builtin(env, "*", builtin_mul)
 	env_add_builtin(env, "/", builtin_div)
-	return 4
+	env_add_builtin(env, "eval", eval)
+	return 5
 }
 
 @(test)
