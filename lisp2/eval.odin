@@ -205,7 +205,7 @@ lambda_apply :: proc(
 }
 
 // bind evaluated_args to formals symbols in env for use by body
-lambda_bind_args :: proc(env: ^Environment, formals: ^Expression, evaluated_args: ^Expression) {
+lambda_bind_args :: proc(env: ^Environment, formals, evaluated_args: ^Expression) {
 	next_formal := car(formals.(Cons_Cell)).(Symbol)
 	env_add(env, next_formal.name, car(evaluated_args.(Cons_Cell)))
 	if _, ok := cdr(formals.(Cons_Cell)).(NIL); !ok {

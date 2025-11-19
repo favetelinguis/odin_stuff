@@ -26,9 +26,8 @@ BuiltinFunction :: struct {
 }
 
 Lambda :: struct {
-	env:     Environment,
-	formals: ^Expression,
-	body:    ^Expression,
+	env:           Environment,
+	formals, body: ^Expression,
 }
 
 Cons_Cell :: struct {
@@ -56,8 +55,7 @@ expr_new :: proc(allocator := context.temp_allocator, loc := #caller_location) -
 // TODO this can be called make_closure i think the (parameter, body, current env) is for let and lambda etc this is a more general
 // pattern then just lambda
 expr_new_lambda :: proc(
-	formals: ^Expression,
-	body: ^Expression,
+	formals, body: ^Expression,
 	parent_env: ^Environment,
 	allocator := context.temp_allocator,
 	loc := #caller_location,
@@ -75,8 +73,7 @@ expr_new_lambda :: proc(
 }
 
 cons :: proc(
-	car: ^Expression,
-	cdr: ^Expression,
+	car, cdr: ^Expression,
 	allocator := context.temp_allocator,
 	loc := #caller_location,
 ) -> ^Expression {

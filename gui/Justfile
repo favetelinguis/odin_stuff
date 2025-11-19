@@ -1,0 +1,8 @@
+dynlib-build:
+	odin build ./dynlib.odin -file -build-mode:dll -out:game_tmp.so
+	# Need to use a temp file on Linux because it first writes an empty `game.so`,
+	# which the game will load before it is actually fully written.
+	mv ./game_tmp.so ./game.so
+
+main-build:
+	odin build ./main.odin -file
